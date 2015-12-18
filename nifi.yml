@@ -1,0 +1,33 @@
+---
+- name: Install Apache Nifi
+  hosts: all
+  sudo: yes
+  vars:
+    nifi_repository: http://mirrors.sonic.net/apache/nifi/0.4.0
+    nifi_tar: nifi-0.4.0-bin.tar.gz
+    nifi_dir: nifi-0.4.0
+  tasks:
+  - name: Install Dependencies
+    yum: name={{ item }} state=latest
+    with_items:
+    - java-1.7.0-openjdk.x86_64
+
+  - name: Check if NiFi TAR exists
+    stat: path=/vagrant/deps/{{ nifi_tar | quote }}
+    register: tar
+
+  - name: Download NiFi TAR
+    get_url: url={{ nifi_repository | quote }}/{{ nifi_tar | quote }} dest=/vagrant/deps/
+    when: tar.stat.exists == False
+
+  - name: Unpack NiFi
+    unarchive: src=/vagrant/deps/{{ nifi_tar }} dest=/opt/ copy=no
+
+  - name: Install Nifi as a Service
+    shell: /opt/{{ nifi_dir }}/bin/nifi.sh install
+
+  - name: Start Nifi
+    service: name=nifi state=restarted
+
+  - name: Wait for Nifi initilization
+    wait_for: port=8080 delay=2

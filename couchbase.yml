@@ -1,0 +1,37 @@
+---
+- name: Base Install Couchbase
+  hosts: all
+  sudo: yes
+  vars:
+    couchbase_repository: http://packages.couchbase.com/releases/4.0.0
+    couchbase_rpm: couchbase-server-enterprise-4.0.0-centos6.x86_64.rpm
+    username: couchbase
+    password: couchbase
+    ram_size: 1024
+  tasks:
+  - name: Check if Couchbase RPM exists
+    stat: path=/vagrant/deps/{{ couchbase_rpm | quote }}
+    register: rpm
+
+  - name: Download Couchbase RPM
+    get_url: url={{ couchbase_repository | quote }}/{{ couchbase_rpm | quote }} dest=/vagrant/deps/
+    when: rpm.stat.exists == False
+
+  - name: Install Couchbase RPM
+    yum: name=/vagrant/deps/{{ couchbase_rpm | quote }} state=present
+
+  - name: Wait for Couchbase initilization
+    wait_for: port=8091 delay=2
+
+  - name: Initialize Cluster
+    shell: /opt/couchbase/bin/couchbase-cli cluster-init -c 127.0.0.1:8091 --cluster-init-username={{ username }} --cluster-init-password={{ password }} --cluster-init-port=8091 --cluster-init-ramsize={{ ram_size }} --services=data,index,query
+
+  - name: Create weather bucket
+    shell: /opt/couchbase/bin/couchbase-cli bucket-create
+      -c 127.0.0.1:8091
+      -u {{ username }}
+      -p {{ password }}
+      --bucket=weather
+      --bucket-type=couchbase
+      --bucket-ramsize={{ ram_size }}
+      --wait
